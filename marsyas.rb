@@ -25,7 +25,7 @@ class Marsyas < Formula
   depends_on "cmake"        => :build
   depends_on "doxygen"      => :build if build.with? "docs"
   depends_on TexRequirement => :build if build.with? "docs"
-  depends_on "qt5"          => :recommended if not build.head?
+  depends_on "qt5"          => :recommended if build.head?
   depends_on "mad"          => :optional
   depends_on "libvorbis"    => :optional
   depends_on "qt"           => :optional # TODO: fix build
