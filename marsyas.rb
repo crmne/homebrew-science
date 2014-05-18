@@ -15,7 +15,7 @@ end
 class Marsyas < Formula
   homepage "http://marsyas.info"
   head "https://github.com/marsyas/marsyas.git"
-  url "http://downloads.sourceforge.net/project/marsyas/marsyas/marsyas-0.4.8.tar.gz"
+  url "https://downloads.sourceforge.net/project/marsyas/marsyas/marsyas-0.4.8.tar.gz"
   sha1 "1af165243a144a24ca08386fc1dc9bea4c93517c"
 
   keg_only "This brew installs more than 30 commands, some with dangerously short names."
@@ -39,7 +39,7 @@ class Marsyas < Formula
 
   def install
     cmake_args = std_cmake_args
-    
+
     %w{mad libvorbis qt qt5 libpng lame}.each do |feature|
       cmake_args << "-DWITH_#{feature.sub('lib', '').upcase}:BOOL=ON" if build.with? feature
     end
@@ -59,12 +59,12 @@ class Marsyas < Formula
 
     if build.with? "docs"
       system "make", "docs" if build.head?
-      
+
       cd "doc" do
         system "cmake", ".", *cmake_args
         system "make", "docs"
       end if not build.head?
-      
+
       doc.install "doc/out-www/"
     end
   end
