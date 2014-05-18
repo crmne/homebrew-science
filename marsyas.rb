@@ -1,17 +1,5 @@
 require "formula"
 
-class TexRequirement < Requirement
-  satisfy :build_env => false do
-    which 'latex' and which 'dvipng'
-  end
-
-  def message; <<-EOS.undent
-    LaTeX not found. This is required to build docs for Marsyas.
-    If you want, https://www.tug.org/mactex/ provides an installer.
-    EOS
-  end
-end
-
 class Marsyas < Formula
   homepage "http://marsyas.info"
   head "https://github.com/marsyas/marsyas.git"
@@ -20,27 +8,32 @@ class Marsyas < Formula
 
   keg_only "This brew installs more than 30 commands, some with dangerously short names."
 
-  option "with-docs", "Install documentation" if build.head? # TODO: fix the latex in 0.4.8
+  option "with-docs", "Install documentation" # FIXME: 0.4.8 fails to build documentation
 
   depends_on "cmake"        => :build
   depends_on "doxygen"      => :build if build.with? "docs"
-  depends_on TexRequirement => :build if build.with? "docs"
+  depends_on :tex           => :build if build.with? "docs"
   depends_on "qt5"          => :recommended if build.head?
   depends_on "mad"          => :optional
   depends_on "libvorbis"    => :optional
-  depends_on "qt"           => :optional # TODO: fix build
+  depends_on "qt"           => :optional # FIXME: cmake fails to recognize qt4 if qt5 is installed
   depends_on "libpng"       => :optional
   depends_on "lame"         => :optional
   depends_on "python"       => :optional
   depends_on "swig"         if build.with? "python"
 
+  # fix the creation of the app bundle of Marsyas Inspector.app
+  # which is only available in HEAD at the moment
+  # and a bug in SoundFileSink.cpp
   patch :DATA               if build.head?
 
-
   def install
+    # fixes "fatal error: 'ft2build.h' file not found" by using cmake's default module
+    rm "cmake-modules/FindFreetype.cmake"
+
     cmake_args = std_cmake_args
 
-    %w{mad libvorbis qt qt5 libpng lame}.each do |feature|
+    %w{mad libvorbis libpng lame}.each do |feature|
       cmake_args << "-DWITH_#{feature.sub('lib', '').upcase}:BOOL=ON" if build.with? feature
     end
 
@@ -49,13 +42,19 @@ class Marsyas < Formula
       cmake_args << "-DWITH_SWIG_PYTHON:BOOL=ON"
     end
 
-    cmake_args << "-DWITH_QT:BOOL=OFF" if build.without? "qt5" and build.without? "qt"
+    # in HEAD QT means QT5, in stable QT means QT4
+    cmake_args << "-DWITH_QT:BOOL=OFF" if build.head? and build.without? "qt5"
+    cmake_args << "-DWITH_QT4:BOOL=ON" if build.head? and build.with? "qt"
+    cmake_args << "-DWITH_QT:BOOL=ON" if (not build.head?) and build.with? "qt"
+    
     cmake_args << "-DMARSYAS_TESTS:BOOL=ON"
+    cmake_args << "-DWITH_OPENGL:BOOL=ON"
 
     cmake_dir = build.head? ? "." : "src"
 
     system "cmake", cmake_dir, *cmake_args
     system "make", "install"
+    system "make", "test"
 
     if build.with? "docs"
       system "make", "docs" if build.head?
@@ -68,18 +67,14 @@ class Marsyas < Formula
       doc.install "doc/out-www/"
     end
   end
-
-  test do
-    system "make", "test"
-  end
 end
 
 __END__
 diff --git a/src/qt5apps/inspector/CMakeLists.txt b/src/qt5apps/inspector/CMakeLists.txt
-index b569082..7100ee7 100644
+index b569082..c1ab9b5 100644
 --- a/src/qt5apps/inspector/CMakeLists.txt
 +++ b/src/qt5apps/inspector/CMakeLists.txt
-@@ -72,9 +72,7 @@ if(APPLE)
+@@ -72,13 +72,12 @@ if(APPLE)
      ${bundle_dir}/Contents/MacOS/marsyas-run
      ${bundle_dir}/Contents/plugins/platforms/libqcocoa.dylib
      ${bundle_dir}/Contents/qml/QtQuick.2/libqtquick2plugin.dylib
@@ -89,16 +84,22 @@ index b569082..7100ee7 100644
    )
  
    install(CODE "
-
-diff --git a/src/qt5apps/inspector/CMakeLists.txt b/src/qt5apps/inspector/CMakeLists.txt
-index 7100ee7..c1ab9b5 100644
---- a/src/qt5apps/inspector/CMakeLists.txt
-+++ b/src/qt5apps/inspector/CMakeLists.txt
-@@ -77,6 +77,7 @@ if(APPLE)
- 
-   install(CODE "
  include(BundleUtilities)
 +set(BU_CHMOD_BUNDLE_ITEMS ON)
  fixup_bundle(
    \"${bundle_dir}\"
    \"${extra_fixup_items}\"
+
+diff --git a/src/marsyas/marsystems/SoundFileSink.cpp b/src/marsyas/marsystems/SoundFileSink.cpp
+index 56b272a..f1f16de 100644
+--- a/src/marsyas/marsystems/SoundFileSink.cpp
++++ b/src/marsyas/marsystems/SoundFileSink.cpp
+@@ -124,7 +124,7 @@ SoundFileSink::updateBackend()
+ #ifdef MARSYAS_LAME
+   else if (ext == ".mp3")
+   {
+-    dest_ = new MP3FileSink(getName());
++    backend_ = new MP3FileSink(getName());
+   }
+ #endif
+   else
