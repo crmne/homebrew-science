@@ -64,7 +64,11 @@ class Marsyas < Formula
         system "make", "docs"
       end if not build.head?
 
-      doc.install "doc/out-www/"
+      rm Dir["doc/out-www/manual/marsyas-cookbook.*"].reject { |f| f['doc/out-www/manual/marsyas-cookbook.pdf'] }
+      rm Dir["doc/out-www/manual/marsyas-devel.*"].reject { |f| f['doc/out-www/manual/marsyas-devel.pdf'] }
+      rm Dir["doc/out-www/manual/marsyas-user.*"].reject { |f| f['doc/out-www/manual/marsyas-user.pdf'] }
+      rm Dir["doc/out-www/sourceDoc/_formulas.*"].reject { |f| f['doc/out-www/manual/sourceDoc/_formulas.dvi'] || f['doc/out-www/manual/sourceDoc/_formulas.tex']}
+      doc.install Dir["doc/out-www/*"]
     end
   end
 end
